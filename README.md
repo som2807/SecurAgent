@@ -10,13 +10,20 @@ AgentBox is a prototype AI agent marketplace where developers can publish agents
 - Ratings and review scoring interaction
 - Recent execution tracking
 - Product roadmap for automation, trust, monetization, and ecosystem scale
+- Full-stack Node/Express API for agents, reviews, runs, and health checks
+- Responsive desktop, tablet, and mobile app shell
 
 ## Local Development
 
 ```bash
 npm install
-npm run dev
+npm run build
+npm start
 ```
+
+The full-stack app runs at `http://127.0.0.1:8080` by default.
+
+For frontend-only development, run `npm run dev` and keep the API server running with `npm run server`.
 
 ## Production Build
 
@@ -26,4 +33,4 @@ npm run build
 
 ## Render
 
-This app is configured as a Render Static Site through `render.yaml`.
+This app is configured as a Render Web Service through `render.yaml`.

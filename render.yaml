@@ -1,8 +1,11 @@
 services:
-  - type: static
+  - type: web
     name: agentbox
-    runtime: static
+    runtime: node
     plan: free
     buildCommand: npm install && npm run build
-    staticPublishPath: dist
-    pullRequestPreviewsEnabled: true
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production

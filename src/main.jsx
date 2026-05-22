@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
   Activity,
@@ -19,7 +19,9 @@ import {
   Gauge,
   GraduationCap,
   KeyRound,
+  Loader2,
   Megaphone,
+  Menu,
   Play,
   Plus,
   Rocket,
@@ -28,168 +30,173 @@ import {
   ShieldCheck,
   Star,
   UserRoundSearch,
-  Users
+  X
 } from 'lucide-react';
 import './styles.css';
 
-const agents = [
-  {
-    id: 'growthlab-campaign',
-    name: 'Marketing Campaign Agent',
-    author: 'GrowthLab',
-    category: 'Marketing',
-    icon: Megaphone,
-    color: 'teal',
-    rating: 4.8,
-    reviews: 128,
-    runs: '1.2K',
-    price: '$0.01 / run',
-    status: 'Verified',
-    audit: 92,
-    model: 'GPT-4o',
-    permissions: ['Ads API', 'Email sending', 'Analytics read'],
-    description: 'Plans, launches, and optimizes campaigns across email, social, ads, and content.',
-    tags: ['Marketing', 'Automation', 'A/B testing'],
-    success: 97,
-    updated: 'May 18, 2026'
-  },
-  {
-    id: 'quantedge-trader',
-    name: 'Crypto Trading Bot',
-    author: 'QuantEdge',
-    category: 'Trading',
-    icon: CircleDollarSign,
-    color: 'amber',
-    rating: 4.7,
-    reviews: 96,
-    runs: '980',
-    price: '$0.03 / run',
-    status: 'Audited',
-    audit: 88,
-    model: 'Claude 3.7',
-    permissions: ['Exchange API', 'Wallet read', 'Market data'],
-    description: 'Automates risk-managed trading decisions with backtests and on-chain signals.',
-    tags: ['Trading', 'DeFi', 'Python'],
-    success: 91,
-    updated: 'May 15, 2026'
-  },
-  {
-    id: 'hireworks-screen',
-    name: 'Resume Screening AI',
-    author: 'HireWorks',
-    category: 'HR',
-    icon: UserRoundSearch,
-    color: 'violet',
-    rating: 4.6,
-    reviews: 72,
-    runs: '760',
-    price: '$0.02 / run',
-    status: 'Verified',
-    audit: 94,
-    model: 'GPT-4.1',
-    permissions: ['Document read', 'ATS API', 'PII detection'],
-    description: 'Ranks resumes, extracts candidate evidence, and creates recruiter-ready summaries.',
-    tags: ['HR', 'NLP', 'OpenAI'],
-    success: 96,
-    updated: 'May 21, 2026'
-  },
-  {
-    id: 'scholar-research',
-    name: 'Student Research Agent',
-    author: 'ScholarAI',
-    category: 'Research',
-    icon: GraduationCap,
-    color: 'green',
-    rating: 4.5,
-    reviews: 54,
-    runs: '620',
-    price: '$0.01 / run',
-    status: 'Community',
-    audit: 81,
-    model: 'Llama 4',
-    permissions: ['Web search', 'Citation export', 'File read'],
-    description: 'Finds, summarizes, and cites academic sources with reproducible research trails.',
-    tags: ['Research', 'RAG', 'Summaries'],
-    success: 89,
-    updated: 'May 10, 2026'
-  }
-];
+const iconMap = {
+  megaphone: Megaphone,
+  dollar: CircleDollarSign,
+  'search-user': UserRoundSearch,
+  graduation: GraduationCap,
+  bot: Bot
+};
 
-const logs = [
-  ['#8192', 'Succeeded', 'Marketing brief generated', '3m 42s'],
-  ['#8191', 'Succeeded', 'Audience clusters synced', '2m 11s'],
-  ['#8190', 'Warning', 'Ad API rate limit retried', '4m 05s'],
-  ['#8189', 'Failed', 'Missing OAuth token', '1m 12s']
-];
+const categories = ['All', 'Marketing', 'Trading', 'HR', 'Research'];
+const apiBase = import.meta.env.DEV ? 'http://127.0.0.1:8080' : '';
+
+async function api(path, options = {}) {
+  const response = await fetch(`${apiBase}${path}`, {
+    headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+    ...options
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || 'Request failed');
+  return data;
+}
 
 function App() {
-  const [selectedId, setSelectedId] = useState(agents[0].id);
+  const [agents, setAgents] = useState([]);
+  const [runs, setRuns] = useState([]);
+  const [selectedId, setSelectedId] = useState('');
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('All');
-  const [drawerOpen, setDrawerOpen] = useState(true);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
   const [runOutput, setRunOutput] = useState('Sandbox ready. Select an agent and run a controlled test.');
   const [reviewScore, setReviewScore] = useState(5);
+  const [notice, setNotice] = useState('');
 
-  const selected = agents.find((agent) => agent.id === selectedId) ?? agents[0];
-  const filteredAgents = useMemo(() => {
-    return agents.filter((agent) => {
-      const matchesQuery = [agent.name, agent.author, agent.category, agent.description, agent.tags.join(' ')]
-        .join(' ')
-        .toLowerCase()
-        .includes(query.toLowerCase());
-      const matchesCategory = category === 'All' || agent.category === category;
-      return matchesQuery && matchesCategory;
-    });
+  useEffect(() => {
+    let ignore = false;
+    async function loadAgents() {
+      setLoading(true);
+      try {
+        const data = await api(`/api/agents?search=${encodeURIComponent(query)}&category=${encodeURIComponent(category)}`);
+        if (ignore) return;
+        setAgents(data.agents);
+        setSelectedId((current) => current || data.agents[0]?.id || '');
+      } catch (error) {
+        setNotice(error.message);
+      } finally {
+        if (!ignore) setLoading(false);
+      }
+    }
+    loadAgents();
+    return () => {
+      ignore = true;
+    };
   }, [query, category]);
 
-  const runSandbox = () => {
+  const selected = useMemo(() => {
+    return agents.find((agent) => agent.id === selectedId) || agents[0];
+  }, [agents, selectedId]);
+
+  useEffect(() => {
+    if (!selected?.id) return;
+    api(`/api/runs?agentId=${selected.id}`)
+      .then((data) => setRuns(data.runs))
+      .catch((error) => setNotice(error.message));
+  }, [selected?.id]);
+
+  const upsertAgent = (agent) => {
+    setAgents((items) => items.map((item) => (item.id === agent.id ? agent : item)));
+  };
+
+  const runSandbox = async () => {
+    if (!selected) return;
     setRunning(true);
     setRunOutput(`Starting ${selected.name} in an isolated sandbox...`);
-    window.setTimeout(() => {
+    try {
+      const data = await api(`/api/agents/${selected.id}/run`, { method: 'POST' });
+      upsertAgent(data.agent);
+      setRuns((items) => [data.run, ...items].slice(0, 8));
+      setRunOutput(data.run.output);
+      setNotice('Sandbox execution completed.');
+    } catch (error) {
+      setRunOutput(error.message);
+    } finally {
       setRunning(false);
-      setRunOutput(
-        `${selected.name} completed safely.\nAudit gates: passed code scan, permission check, output validation.\nResult: generated a sample task plan with confidence ${selected.success}%.`
-      );
-    }, 1100);
+    }
+  };
+
+  const submitReview = async () => {
+    if (!selected) return;
+    try {
+      const data = await api(`/api/agents/${selected.id}/reviews`, {
+        method: 'POST',
+        body: JSON.stringify({ score: Number(reviewScore) })
+      });
+      upsertAgent(data.agent);
+      setNotice('Review submitted.');
+    } catch (error) {
+      setNotice(error.message);
+    }
+  };
+
+  const publishAgent = async (payload) => {
+    const data = await api('/api/agents', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+    setAgents((items) => [data.agent, ...items]);
+    setSelectedId(data.agent.id);
+    setDrawerOpen(false);
+    setNotice('Agent submitted for verification.');
   };
 
   return (
     <div className="app-shell">
-      <Sidebar />
+      <Sidebar open={mobileNavOpen} onClose={() => setMobileNavOpen(false)} />
       <main className="main-panel">
-        <Topbar query={query} setQuery={setQuery} onPublish={() => setDrawerOpen(true)} />
+        <Topbar
+          query={query}
+          setQuery={setQuery}
+          onPublish={() => setDrawerOpen(true)}
+          onMenu={() => setMobileNavOpen(true)}
+        />
         <section className="workspace">
           <div className="marketplace-column">
-            <MarketplaceHeader category={category} setCategory={setCategory} count={filteredAgents.length} />
-            <div className="agent-list">
-              {filteredAgents.map((agent) => (
-                <AgentCard
-                  key={agent.id}
-                  agent={agent}
-                  active={selected.id === agent.id}
-                  onClick={() => setSelectedId(agent.id)}
-                />
-              ))}
-            </div>
+            {notice && <div className="notice">{notice}<button onClick={() => setNotice('')}><X size={14} /></button></div>}
+            <MarketplaceHeader category={category} setCategory={setCategory} count={agents.length} />
+            {loading ? (
+              <div className="loading-state"><Loader2 size={22} /> Loading agents from API...</div>
+            ) : (
+              <div className="agent-list">
+                {agents.map((agent) => (
+                  <AgentCard
+                    key={agent.id}
+                    agent={agent}
+                    active={selected?.id === agent.id}
+                    onClick={() => setSelectedId(agent.id)}
+                  />
+                ))}
+              </div>
+            )}
             <Roadmap />
           </div>
-          <AgentDetail
-            agent={selected}
-            running={running}
-            runOutput={runOutput}
-            onRun={runSandbox}
-            reviewScore={reviewScore}
-            setReviewScore={setReviewScore}
-          />
-          {drawerOpen && <PublishDrawer onClose={() => setDrawerOpen(false)} />}
+          {selected && (
+            <AgentDetail
+              agent={selected}
+              runs={runs}
+              running={running}
+              runOutput={runOutput}
+              onRun={runSandbox}
+              reviewScore={reviewScore}
+              setReviewScore={setReviewScore}
+              onReview={submitReview}
+            />
+          )}
+          {drawerOpen && <PublishDrawer onClose={() => setDrawerOpen(false)} onSubmit={publishAgent} />}
         </section>
       </main>
     </div>
   );
 }
 
-function Sidebar() {
+function Sidebar({ open, onClose }) {
   const primary = [
     ['Marketplace', Box],
     ['Publish', Plus],
@@ -204,43 +211,48 @@ function Sidebar() {
     ['Settings', Settings]
   ];
   return (
-    <aside className="sidebar">
-      <div className="brand">
-        <div className="brand-mark"><Box size={21} /></div>
-        <span>AgentBox</span>
-      </div>
-      <button className="team-switcher">
-        <span className="avatar">AC</span>
-        <span><strong>Acme Corp</strong><small>Team plan</small></span>
-        <ChevronDown size={16} />
-      </button>
-      <nav>
-        {primary.map(([label, Icon], index) => (
-          <button className={index === 0 ? 'nav-item active' : 'nav-item'} key={label}>
-            <Icon size={18} /> {label}
-          </button>
-        ))}
-      </nav>
-      <div className="nav-section">Manage</div>
-      <nav>
-        {manage.map(([label, Icon]) => (
-          <button className="nav-item compact" key={label}>
-            <Icon size={16} /> {label}
-          </button>
-        ))}
-      </nav>
-      <div className="user-card">
-        <span className="avatar mint">JS</span>
-        <span><strong>Jane Smith</strong><small>jane@acme.com</small></span>
-      </div>
-    </aside>
+    <>
+      <button className={open ? 'nav-scrim visible' : 'nav-scrim'} onClick={onClose} aria-label="Close navigation" />
+      <aside className={open ? 'sidebar open' : 'sidebar'}>
+        <div className="brand">
+          <div className="brand-mark"><Box size={21} /></div>
+          <span>AgentBox</span>
+          <button className="mobile-close" onClick={onClose} title="Close"><X size={18} /></button>
+        </div>
+        <button className="team-switcher">
+          <span className="avatar">AC</span>
+          <span><strong>Acme Corp</strong><small>Team plan</small></span>
+          <ChevronDown size={16} />
+        </button>
+        <nav>
+          {primary.map(([label, Icon], index) => (
+            <button className={index === 0 ? 'nav-item active' : 'nav-item'} key={label}>
+              <Icon size={18} /> {label}
+            </button>
+          ))}
+        </nav>
+        <div className="nav-section">Manage</div>
+        <nav>
+          {manage.map(([label, Icon]) => (
+            <button className="nav-item compact" key={label}>
+              <Icon size={16} /> {label}
+            </button>
+          ))}
+        </nav>
+        <div className="user-card">
+          <span className="avatar mint">JS</span>
+          <span><strong>Jane Smith</strong><small>jane@acme.com</small></span>
+        </div>
+      </aside>
+    </>
   );
 }
 
-function Topbar({ query, setQuery, onPublish }) {
+function Topbar({ query, setQuery, onPublish, onMenu }) {
   return (
     <header className="topbar">
-      <div>
+      <button className="icon-button menu-button" onClick={onMenu} title="Open navigation"><Menu size={19} /></button>
+      <div className="title-block">
         <h1>Marketplace</h1>
         <p>Discover verified AI agents, test them in sandboxes, and deploy with confidence.</p>
       </div>
@@ -249,14 +261,13 @@ function Topbar({ query, setQuery, onPublish }) {
         <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search agents, capabilities, or authors..." />
       </label>
       <button className="icon-button" title="Notifications"><Bell size={18} /></button>
-      <button className="secondary-button"><Filter size={17} /> Filters</button>
+      <button className="secondary-button filter-button"><Filter size={17} /> Filters</button>
       <button className="primary-button" onClick={onPublish}><Plus size={18} /> Publish Agent</button>
     </header>
   );
 }
 
 function MarketplaceHeader({ category, setCategory, count }) {
-  const categories = ['All', 'Marketing', 'Trading', 'HR', 'Research'];
   return (
     <div className="marketplace-header">
       <div className="tabs">
@@ -272,7 +283,7 @@ function MarketplaceHeader({ category, setCategory, count }) {
 }
 
 function AgentCard({ agent, active, onClick }) {
-  const Icon = agent.icon;
+  const Icon = iconMap[agent.icon] || Bot;
   return (
     <button className={active ? 'agent-card active' : 'agent-card'} onClick={onClick}>
       <span className={`agent-icon ${agent.color}`}><Icon size={31} /></span>
@@ -283,8 +294,8 @@ function AgentCard({ agent, active, onClick }) {
         <span className="tag-row">{agent.tags.map((tag) => <span key={tag}>{tag}</span>)}</span>
       </span>
       <span className="agent-meta">
-        <strong><Star size={14} fill="currentColor" /> {agent.rating}</strong>
-        <small>({agent.reviews})</small>
+        <strong><Star size={14} fill="currentColor" /> {agent.rating || 'New'}</strong>
+        <small>{agent.reviews ? `(${agent.reviews})` : 'No reviews'}</small>
         <Sparkline />
       </span>
     </button>
@@ -295,16 +306,16 @@ function Sparkline() {
   return <span className="sparkline" aria-hidden="true"><i /><i /><i /><i /><i /><i /><i /></span>;
 }
 
-function AgentDetail({ agent, running, runOutput, onRun, reviewScore, setReviewScore }) {
-  const Icon = agent.icon;
+function AgentDetail({ agent, runs, running, runOutput, onRun, reviewScore, setReviewScore, onReview }) {
+  const Icon = iconMap[agent.icon] || Bot;
   return (
     <aside className="detail-panel">
       <div className="detail-heading">
         <span className={`agent-icon large ${agent.color}`}><Icon size={35} /></span>
         <div>
           <h2>{agent.name}</h2>
-          <p>by {agent.author} · {agent.status} publisher</p>
-          <span className="rating"><Star size={14} fill="currentColor" /> {agent.rating} ({agent.reviews} reviews) · {agent.runs} runs</span>
+          <p>by {agent.author} - {agent.status} publisher</p>
+          <span className="rating"><Star size={14} fill="currentColor" /> {agent.rating || 'New'} ({agent.reviews} reviews) - {agent.runsLabel} runs</span>
         </div>
       </div>
       <p className="detail-copy">{agent.description}</p>
@@ -330,7 +341,7 @@ function AgentDetail({ agent, running, runOutput, onRun, reviewScore, setReviewS
         <div><dt>Model</dt><dd>{agent.model}</dd></div>
         <div><dt>Pricing</dt><dd>{agent.price}</dd></div>
         <div><dt>Updated</dt><dd>{agent.updated}</dd></div>
-        <div><dt>Permissions</dt><dd>{agent.permissions.join(', ')}</dd></div>
+        <div><dt>Permissions</dt><dd>{agent.permissions.join(', ') || 'None requested'}</dd></div>
       </dl>
       <div className="action-row">
         <button className="secondary-button" onClick={onRun} disabled={running}><FlaskConical size={17} /> {running ? 'Running...' : 'Run in Sandbox'}</button>
@@ -342,18 +353,21 @@ function AgentDetail({ agent, running, runOutput, onRun, reviewScore, setReviewS
           <h3>Ratings & Reviews</h3>
           <span>{reviewScore}.0 selected</span>
         </div>
-        <input type="range" min="1" max="5" value={reviewScore} onChange={(event) => setReviewScore(event.target.value)} />
+        <div className="review-row">
+          <input type="range" min="1" max="5" value={reviewScore} onChange={(event) => setReviewScore(event.target.value)} />
+          <button className="secondary-button" onClick={onReview}>Submit</button>
+        </div>
       </div>
       <div className="run-table">
         <div className="section-title">
           <h3>Recent Runs</h3>
-          <a href="#runs">View all runs</a>
+          <a href="#runs">Live API</a>
         </div>
-        {logs.map(([id, status, task, duration]) => (
-          <div className="run-row" key={id}>
-            <span className={`status-dot ${status.toLowerCase()}`} />
-            <span><strong>Run {id}</strong><small>{task}</small></span>
-            <em>{duration}</em>
+        {(runs.length ? runs : []).map((run) => (
+          <div className="run-row" key={run.id}>
+            <span className={`status-dot ${run.status.toLowerCase()}`} />
+            <span><strong>Run {run.id}</strong><small>{run.task}</small></span>
+            <em>{run.duration}</em>
           </div>
         ))}
       </div>
@@ -361,7 +375,45 @@ function AgentDetail({ agent, running, runOutput, onRun, reviewScore, setReviewS
   );
 }
 
-function PublishDrawer({ onClose }) {
+function PublishDrawer({ onClose, onSubmit }) {
+  const [form, setForm] = useState({
+    name: '',
+    category: '',
+    description: '',
+    endpoint: '',
+    permissions: ['Internet Access', 'External APIs'],
+    runtime: '300 seconds',
+    memory: '512 MB'
+  });
+  const [submitting, setSubmitting] = useState(false);
+
+  const setField = (field, value) => setForm((current) => ({ ...current, [field]: value }));
+  const togglePermission = (permission) => {
+    setForm((current) => ({
+      ...current,
+      permissions: current.permissions.includes(permission)
+        ? current.permissions.filter((item) => item !== permission)
+        : [...current.permissions, permission]
+    }));
+  };
+
+  const submit = async (event) => {
+    event.preventDefault();
+    setSubmitting(true);
+    try {
+      await onSubmit({
+        name: form.name,
+        category: form.category,
+        description: form.description,
+        permissions: form.permissions,
+        tags: [form.category, 'Submitted'],
+        model: form.endpoint ? 'External API' : 'Custom Script'
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
     <aside className="publish-drawer">
       <div className="drawer-head">
@@ -369,28 +421,26 @@ function PublishDrawer({ onClose }) {
           <h2>Publish Agent</h2>
           <p>Package a script or API workflow for marketplace review.</p>
         </div>
-        <button className="icon-button" onClick={onClose} title="Close">×</button>
+        <button className="icon-button" onClick={onClose} title="Close"><X size={18} /></button>
       </div>
       <div className="steps"><span className="active">1</span><i /><span>2</span><i /><span>3</span></div>
-      <form>
-        <label>Agent Name<input placeholder="e.g. Lead Enrichment Agent" /></label>
-        <label>Agent Type<select defaultValue=""><option value="" disabled>Select type</option><option>Marketing</option><option>Trading</option><option>HR</option><option>Research</option></select></label>
-        <label>Description<textarea placeholder="Describe what your agent does, who should use it, and expected outputs." /></label>
+      <form onSubmit={submit}>
+        <label>Agent Name<input required value={form.name} onChange={(event) => setField('name', event.target.value)} placeholder="e.g. Lead Enrichment Agent" /></label>
+        <label>Agent Type<select required value={form.category} onChange={(event) => setField('category', event.target.value)}><option value="" disabled>Select type</option><option>Marketing</option><option>Trading</option><option>HR</option><option>Research</option></select></label>
+        <label>Description<textarea required value={form.description} onChange={(event) => setField('description', event.target.value)} placeholder="Describe what your agent does, who should use it, and expected outputs." /></label>
         <div className="segmented"><button type="button" className="active">Script</button><button type="button">API Endpoint</button></div>
-        <label>Script / API Endpoint<textarea className="code-input" placeholder="// Paste Python, Node.js, or endpoint details..." /></label>
+        <label>Script / API Endpoint<textarea className="code-input" value={form.endpoint} onChange={(event) => setField('endpoint', event.target.value)} placeholder="// Paste Python, Node.js, or endpoint details..." /></label>
         <fieldset>
           <legend>Permissions</legend>
-          {['Internet Access', 'File System Read', 'External APIs', 'Send Emails'].map((item, index) => (
-            <label className="checkbox" key={item}><input type="checkbox" defaultChecked={index < 3} /> {item}</label>
+          {['Internet Access', 'File System Read', 'External APIs', 'Send Emails'].map((item) => (
+            <label className="checkbox" key={item}><input type="checkbox" checked={form.permissions.includes(item)} onChange={() => togglePermission(item)} /> {item}</label>
           ))}
         </fieldset>
         <div className="limits">
-          <label>Max Runtime<input defaultValue="300 seconds" /></label>
-          <label>Memory<input defaultValue="512 MB" /></label>
-          <label>CPU<input defaultValue="1 vCPU" /></label>
-          <label>Timeout<input defaultValue="30 seconds" /></label>
+          <label>Max Runtime<input value={form.runtime} onChange={(event) => setField('runtime', event.target.value)} /></label>
+          <label>Memory<input value={form.memory} onChange={(event) => setField('memory', event.target.value)} /></label>
         </div>
-        <div className="drawer-actions"><button type="button" className="secondary-button">Save Draft</button><button type="button" className="primary-button">Submit for Verification</button></div>
+        <div className="drawer-actions"><button type="button" className="secondary-button" onClick={onClose}>Save Draft</button><button type="submit" className="primary-button" disabled={submitting}>{submitting ? 'Submitting...' : 'Submit for Verification'}</button></div>
       </form>
     </aside>
   );
