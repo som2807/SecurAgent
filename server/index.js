@@ -154,6 +154,7 @@ app.post('/api/agents', (request, response) => {
     audit: 70,
     model: body.model || 'Custom API',
     permissions: body.permissions || [],
+    githubUrl: body.githubUrl || '',
     description: body.description,
     tags: body.tags || [body.category],
     success: 0,

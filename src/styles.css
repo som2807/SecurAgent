@@ -157,6 +157,8 @@ h1, h2, h3, p { margin: 0; }
 .spec-list div { display: grid; grid-template-columns: 110px 1fr; gap: 8px; }
 .spec-list dt { color: var(--muted); font-size: 13px; }
 .spec-list dd { margin: 0; font-weight: 700; font-size: 13px; line-height: 1.4; }
+.spec-list a, .repo-link { color: var(--teal-dark); text-decoration: none; overflow-wrap: anywhere; }
+.spec-list a:hover, .repo-link:hover { text-decoration: underline; }
 .action-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .sandbox-output {
   white-space: pre-wrap; margin: 14px 0; border: 1px solid #cfe2e0; background: #f3fbfa; border-radius: 8px;
@@ -289,6 +291,7 @@ legend { color: #293640; font-weight: 800; font-size: 13px; margin-bottom: 8px; 
   padding: 16px;
 }
 .card-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.repo-link { display: block; font-size: 12px; font-weight: 800; margin: 8px 0 2px; }
 .audit-timeline { display: grid; gap: 0; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
 .audit-item {
   display: grid;

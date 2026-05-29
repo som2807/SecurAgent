@@ -376,6 +376,7 @@ function AgentDetail({ agent, runs, running, runOutput, onRun, reviewScore, setR
         <div><dt>Model</dt><dd>{agent.model}</dd></div>
         <div><dt>Pricing</dt><dd>{agent.price}</dd></div>
         <div><dt>Updated</dt><dd>{agent.updated}</dd></div>
+        <div><dt>GitHub</dt><dd>{agent.githubUrl ? <a href={agent.githubUrl} target="_blank" rel="noreferrer">{agent.githubUrl}</a> : 'Not provided'}</dd></div>
         <div><dt>Permissions</dt><dd>{agent.permissions.join(', ') || 'None requested'}</dd></div>
       </dl>
       <div className="action-row">
@@ -415,6 +416,7 @@ function PublishSection({ onSubmit }) {
     name: '',
     category: '',
     description: '',
+    githubUrl: '',
     endpoint: '',
     permissions: ['Internet Access', 'External APIs'],
     runtime: '300 seconds',
@@ -440,6 +442,7 @@ function PublishSection({ onSubmit }) {
         name: form.name,
         category: form.category,
         description: form.description,
+        githubUrl: form.githubUrl,
         permissions: form.permissions,
         tags: [form.category, 'Submitted'],
         model: form.endpoint ? 'External API' : 'Custom Script'
@@ -464,6 +467,7 @@ function PublishSection({ onSubmit }) {
         <label>Agent Name<input required value={form.name} onChange={(event) => setField('name', event.target.value)} placeholder="e.g. Lead Enrichment Agent" /></label>
         <label>Agent Type<select required value={form.category} onChange={(event) => setField('category', event.target.value)}><option value="" disabled>Select type</option><option>Marketing</option><option>Trading</option><option>HR</option><option>Research</option></select></label>
         <label>Description<textarea required value={form.description} onChange={(event) => setField('description', event.target.value)} placeholder="Describe what your agent does, who should use it, and expected outputs." /></label>
+        <label>GitHub Repository<input type="url" value={form.githubUrl} onChange={(event) => setField('githubUrl', event.target.value)} placeholder="https://github.com/your-org/your-agent" /></label>
         <div className="segmented"><button type="button" className="active">Script</button><button type="button">API Endpoint</button></div>
         <label>Script / API Endpoint<textarea className="code-input" value={form.endpoint} onChange={(event) => setField('endpoint', event.target.value)} placeholder="// Paste Python, Node.js, or endpoint details..." /></label>
         <fieldset>
@@ -557,6 +561,7 @@ function MyAgentsSection({ agents, setActiveSection }) {
                 <div>
                   <strong>{agent.name}</strong>
                   <small>{agent.category} - {agent.status} - {agent.runsLabel} runs</small>
+                  {agent.githubUrl && <a className="repo-link" href={agent.githubUrl} target="_blank" rel="noreferrer">{agent.githubUrl}</a>}
                   <div className="tag-row">{agent.permissions.slice(0, 3).map((permission) => <span key={permission}>{permission}</span>)}</div>
                 </div>
                 <div className="card-actions">
