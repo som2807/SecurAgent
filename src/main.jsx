@@ -18,6 +18,7 @@ import {
   FlaskConical,
   Gauge,
   GraduationCap,
+  History,
   KeyRound,
   Loader2,
   Megaphone,
@@ -29,6 +30,7 @@ import {
   Settings,
   ShieldCheck,
   Star,
+  UserCheck,
   UserRoundSearch,
   X
 } from 'lucide-react';
@@ -58,10 +60,11 @@ async function api(path, options = {}) {
 function App() {
   const [agents, setAgents] = useState([]);
   const [runs, setRuns] = useState([]);
+  const [allRuns, setAllRuns] = useState([]);
   const [selectedId, setSelectedId] = useState('');
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('All');
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [activeSection, setActiveSection] = useState('Marketplace');
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
@@ -101,6 +104,12 @@ function App() {
       .catch((error) => setNotice(error.message));
   }, [selected?.id]);
 
+  useEffect(() => {
+    api('/api/runs')
+      .then((data) => setAllRuns(data.runs))
+      .catch((error) => setNotice(error.message));
+  }, [runs.length]);
+
   const upsertAgent = (agent) => {
     setAgents((items) => items.map((item) => (item.id === agent.id ? agent : item)));
   };
@@ -113,6 +122,7 @@ function App() {
       const data = await api(`/api/agents/${selected.id}/run`, { method: 'POST' });
       upsertAgent(data.agent);
       setRuns((items) => [data.run, ...items].slice(0, 8));
+      setAllRuns((items) => [data.run, ...items].slice(0, 20));
       setRunOutput(data.run.output);
       setNotice('Sandbox execution completed.');
     } catch (error) {
@@ -143,60 +153,74 @@ function App() {
     });
     setAgents((items) => [data.agent, ...items]);
     setSelectedId(data.agent.id);
-    setDrawerOpen(false);
+    setActiveSection('My Agents');
     setNotice('Agent submitted for verification.');
   };
 
   return (
     <div className="app-shell">
-      <Sidebar open={mobileNavOpen} onClose={() => setMobileNavOpen(false)} />
+      <Sidebar
+        activeSection={activeSection}
+        setActiveSection={setActiveSection}
+        open={mobileNavOpen}
+        onClose={() => setMobileNavOpen(false)}
+      />
       <main className="main-panel">
         <Topbar
+          activeSection={activeSection}
           query={query}
           setQuery={setQuery}
-          onPublish={() => setDrawerOpen(true)}
+          onPublish={() => setActiveSection('Publish')}
           onMenu={() => setMobileNavOpen(true)}
         />
-        <section className="workspace">
-          <div className="marketplace-column">
-            {notice && <div className="notice">{notice}<button onClick={() => setNotice('')}><X size={14} /></button></div>}
-            <MarketplaceHeader category={category} setCategory={setCategory} count={agents.length} />
-            {loading ? (
-              <div className="loading-state"><Loader2 size={22} /> Loading agents from API...</div>
-            ) : (
-              <div className="agent-list">
-                {agents.map((agent) => (
-                  <AgentCard
-                    key={agent.id}
-                    agent={agent}
-                    active={selected?.id === agent.id}
-                    onClick={() => setSelectedId(agent.id)}
-                  />
-                ))}
-              </div>
+        {notice && <div className="page-notice notice">{notice}<button onClick={() => setNotice('')}><X size={14} /></button></div>}
+        {activeSection === 'Marketplace' && (
+          <section className="workspace">
+            <div className="marketplace-column">
+              <MarketplaceHeader category={category} setCategory={setCategory} count={agents.length} />
+              {loading ? (
+                <div className="loading-state"><Loader2 size={22} /> Loading agents from API...</div>
+              ) : (
+                <div className="agent-list">
+                  {agents.map((agent) => (
+                    <AgentCard
+                      key={agent.id}
+                      agent={agent}
+                      active={selected?.id === agent.id}
+                      onClick={() => setSelectedId(agent.id)}
+                    />
+                  ))}
+                </div>
+              )}
+              <Roadmap />
+            </div>
+            {selected && (
+              <AgentDetail
+                agent={selected}
+                runs={runs}
+                running={running}
+                runOutput={runOutput}
+                onRun={runSandbox}
+                reviewScore={reviewScore}
+                setReviewScore={setReviewScore}
+                onReview={submitReview}
+              />
             )}
-            <Roadmap />
-          </div>
-          {selected && (
-            <AgentDetail
-              agent={selected}
-              runs={runs}
-              running={running}
-              runOutput={runOutput}
-              onRun={runSandbox}
-              reviewScore={reviewScore}
-              setReviewScore={setReviewScore}
-              onReview={submitReview}
-            />
-          )}
-          {drawerOpen && <PublishDrawer onClose={() => setDrawerOpen(false)} onSubmit={publishAgent} />}
-        </section>
+          </section>
+        )}
+        {activeSection === 'Publish' && <PublishSection onSubmit={publishAgent} />}
+        {activeSection === 'Runs' && <RunsSection agents={agents} runs={allRuns} onRun={runSandbox} selected={selected} running={running} />}
+        {activeSection === 'My Agents' && <MyAgentsSection agents={agents} setActiveSection={setActiveSection} />}
+        {activeSection === 'Audit Logs' && <AuditLogsSection agents={agents} runs={allRuns} />}
+        {!['Marketplace', 'Publish', 'Runs', 'My Agents', 'Audit Logs'].includes(activeSection) && (
+          <UtilitySection title={activeSection} />
+        )}
       </main>
     </div>
   );
 }
 
-function Sidebar({ open, onClose }) {
+function Sidebar({ activeSection, setActiveSection, open, onClose }) {
   const primary = [
     ['Marketplace', Box],
     ['Publish', Plus],
@@ -216,17 +240,17 @@ function Sidebar({ open, onClose }) {
       <aside className={open ? 'sidebar open' : 'sidebar'}>
         <div className="brand">
           <div className="brand-mark"><Box size={21} /></div>
-          <span>AgentBox</span>
+          <span>SecurAgent</span>
           <button className="mobile-close" onClick={onClose} title="Close"><X size={18} /></button>
         </div>
         <button className="team-switcher">
-          <span className="avatar">AC</span>
-          <span><strong>Acme Corp</strong><small>Team plan</small></span>
+          <span className="avatar">SA</span>
+          <span><strong>SecurAgent Group</strong><small>Team plan</small></span>
           <ChevronDown size={16} />
         </button>
         <nav>
-          {primary.map(([label, Icon], index) => (
-            <button className={index === 0 ? 'nav-item active' : 'nav-item'} key={label}>
+          {primary.map(([label, Icon]) => (
+            <button className={activeSection === label ? 'nav-item active' : 'nav-item'} key={label} onClick={() => { setActiveSection(label); onClose(); }}>
               <Icon size={18} /> {label}
             </button>
           ))}
@@ -234,27 +258,38 @@ function Sidebar({ open, onClose }) {
         <div className="nav-section">Manage</div>
         <nav>
           {manage.map(([label, Icon]) => (
-            <button className="nav-item compact" key={label}>
+            <button className={activeSection === label ? 'nav-item compact active' : 'nav-item compact'} key={label} onClick={() => { setActiveSection(label); onClose(); }}>
               <Icon size={16} /> {label}
             </button>
           ))}
         </nav>
         <div className="user-card">
-          <span className="avatar mint">JS</span>
-          <span><strong>Jane Smith</strong><small>jane@acme.com</small></span>
+          <span className="avatar mint">SM</span>
+          <span><strong>S Maji</strong><small>sm12345@gmail.com</small></span>
         </div>
       </aside>
     </>
   );
 }
 
-function Topbar({ query, setQuery, onPublish, onMenu }) {
+function Topbar({ activeSection, query, setQuery, onPublish, onMenu }) {
+  const descriptions = {
+    Marketplace: 'Discover verified AI agents, test them in sandboxes, and deploy with confidence.',
+    Publish: 'Submit scripts and API workflows for SecurAgent verification.',
+    Runs: 'Monitor sandbox executions, deployment attempts, and autonomous task history.',
+    Verification: 'Review trust checks, code scans, policy gates, and reputation signals.',
+    Billing: 'Track subscriptions, execution spend, and marketplace commissions.',
+    'My Agents': 'Manage your published agents, verification state, pricing, and performance.',
+    'API Keys': 'Manage integration keys and permission scopes for agent execution.',
+    'Audit Logs': 'Inspect security events, verification changes, and sandbox activity.',
+    Settings: 'Configure workspace preferences and operational controls.'
+  };
   return (
     <header className="topbar">
       <button className="icon-button menu-button" onClick={onMenu} title="Open navigation"><Menu size={19} /></button>
       <div className="title-block">
-        <h1>Marketplace</h1>
-        <p>Discover verified AI agents, test them in sandboxes, and deploy with confidence.</p>
+        <h1>{activeSection}</h1>
+        <p>{descriptions[activeSection] || descriptions.Marketplace}</p>
       </div>
       <label className="search-box">
         <Search size={18} />
@@ -262,7 +297,7 @@ function Topbar({ query, setQuery, onPublish, onMenu }) {
       </label>
       <button className="icon-button" title="Notifications"><Bell size={18} /></button>
       <button className="secondary-button filter-button"><Filter size={17} /> Filters</button>
-      <button className="primary-button" onClick={onPublish}><Plus size={18} /> Publish Agent</button>
+      <button className="primary-button top-publish" onClick={onPublish}><Plus size={18} /> Publish Agent</button>
     </header>
   );
 }
@@ -375,7 +410,7 @@ function AgentDetail({ agent, runs, running, runOutput, onRun, reviewScore, setR
   );
 }
 
-function PublishDrawer({ onClose, onSubmit }) {
+function PublishSection({ onSubmit }) {
   const [form, setForm] = useState({
     name: '',
     category: '',
@@ -415,13 +450,14 @@ function PublishDrawer({ onClose, onSubmit }) {
   };
 
   return (
-    <aside className="publish-drawer">
+    <section className="section-page publish-page">
+      <div className="section-grid">
+        <div className="section-panel publish-main">
       <div className="drawer-head">
         <div>
           <h2>Publish Agent</h2>
-          <p>Package a script or API workflow for marketplace review.</p>
+          <p>Package a script or API workflow for SecurAgent marketplace review.</p>
         </div>
-        <button className="icon-button" onClick={onClose} title="Close"><X size={18} /></button>
       </div>
       <div className="steps"><span className="active">1</span><i /><span>2</span><i /><span>3</span></div>
       <form onSubmit={submit}>
@@ -440,9 +476,152 @@ function PublishDrawer({ onClose, onSubmit }) {
           <label>Max Runtime<input value={form.runtime} onChange={(event) => setField('runtime', event.target.value)} /></label>
           <label>Memory<input value={form.memory} onChange={(event) => setField('memory', event.target.value)} /></label>
         </div>
-        <div className="drawer-actions"><button type="button" className="secondary-button" onClick={onClose}>Save Draft</button><button type="submit" className="primary-button" disabled={submitting}>{submitting ? 'Submitting...' : 'Submit for Verification'}</button></div>
+        <div className="drawer-actions"><button type="button" className="secondary-button">Save Draft</button><button type="submit" className="primary-button" disabled={submitting}>{submitting ? 'Submitting...' : 'Submit for Verification'}</button></div>
       </form>
-    </aside>
+        </div>
+        <div className="section-panel checklist-panel">
+          <div className="section-title"><h3>Verification Pipeline</h3><span>3 steps</span></div>
+          {[
+            ['Package Scan', 'Static checks, dependency review, and secret detection.'],
+            ['Sandbox Run', 'Controlled test execution with runtime and network limits.'],
+            ['Trust Review', 'Audit score, permission summary, and marketplace readiness.']
+          ].map(([title, text], index) => (
+            <div className="check-step" key={title}>
+              <span>{index + 1}</span>
+              <div><strong>{title}</strong><small>{text}</small></div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function RunsSection({ agents, runs, onRun, selected, running }) {
+  const runStats = [
+    ['Total Runs', runs.length || 4, Activity],
+    ['Succeeded', runs.filter((run) => run.status === 'Succeeded').length || 2, Check],
+    ['Warnings', runs.filter((run) => run.status === 'Warning').length || 1, ShieldCheck],
+    ['Failed', runs.filter((run) => run.status === 'Failed').length || 1, X]
+  ];
+  return (
+    <section className="section-page">
+      <div className="metric-grid">
+        {runStats.map(([label, value, Icon]) => (
+          <div className="metric-card" key={label}>
+            <Icon size={18} />
+            <span>{label}</span>
+            <strong>{value}</strong>
+          </div>
+        ))}
+      </div>
+      <div className="section-panel">
+        <div className="section-title">
+          <h3>Execution Runs</h3>
+          <button className="primary-button" onClick={onRun} disabled={running || !selected}><Play size={17} /> {running ? 'Running...' : 'Run Selected Agent'}</button>
+        </div>
+        <div className="data-table">
+          <div className="table-head"><span>Run</span><span>Agent</span><span>Status</span><span>Duration</span><span>Created</span></div>
+          {(runs.length ? runs : []).map((run) => {
+            const agent = agents.find((item) => item.id === run.agentId);
+            return (
+              <div className="table-row" key={run.id}>
+                <strong>{run.id}</strong>
+                <span>{agent?.name || run.agentId}</span>
+                <span className={`table-status ${run.status.toLowerCase()}`}>{run.status}</span>
+                <span>{run.duration}</span>
+                <span>{new Date(run.createdAt).toLocaleString()}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function MyAgentsSection({ agents, setActiveSection }) {
+  return (
+    <section className="section-page">
+      <div className="section-panel">
+        <div className="section-title">
+          <h3>My Agents</h3>
+          <button className="primary-button" onClick={() => setActiveSection('Publish')}><Plus size={17} /> New Agent</button>
+        </div>
+        <div className="agent-management-grid">
+          {agents.map((agent) => {
+            const Icon = iconMap[agent.icon] || Bot;
+            return (
+              <div className="management-card" key={agent.id}>
+                <span className={`agent-icon ${agent.color}`}><Icon size={28} /></span>
+                <div>
+                  <strong>{agent.name}</strong>
+                  <small>{agent.category} - {agent.status} - {agent.runsLabel} runs</small>
+                  <div className="tag-row">{agent.permissions.slice(0, 3).map((permission) => <span key={permission}>{permission}</span>)}</div>
+                </div>
+                <div className="card-actions">
+                  <button className="secondary-button"><Settings size={16} /> Manage</button>
+                  <button className="secondary-button"><ShieldCheck size={16} /> Audit</button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function AuditLogsSection({ agents, runs }) {
+  const auditItems = [
+    ...agents.slice(0, 4).map((agent) => ({
+      id: `audit-${agent.id}`,
+      title: `${agent.name} verification refreshed`,
+      detail: `${agent.status} publisher with audit score ${agent.audit}`,
+      type: agent.audit > 90 ? 'Passed' : 'Review',
+      time: agent.updated
+    })),
+    ...runs.slice(0, 4).map((run) => ({
+      id: `run-${run.id}`,
+      title: `${run.id} sandbox event recorded`,
+      detail: run.task,
+      type: run.status,
+      time: new Date(run.createdAt).toLocaleString()
+    }))
+  ];
+  return (
+    <section className="section-page">
+      <div className="section-panel">
+        <div className="section-title">
+          <h3>Audit Logs</h3>
+          <span>Security and trust events</span>
+        </div>
+        <div className="audit-timeline">
+          {auditItems.map((item) => (
+            <div className="audit-item" key={item.id}>
+              <span className={`status-dot ${item.type.toLowerCase()}`} />
+              <div>
+                <strong>{item.title}</strong>
+                <small>{item.detail}</small>
+              </div>
+              <em>{item.time}</em>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function UtilitySection({ title }) {
+  return (
+    <section className="section-page">
+      <div className="section-panel utility-panel">
+        <ShieldCheck size={30} />
+        <h2>{title}</h2>
+        <p>This SecurAgent workspace area is ready for the next backend module.</p>
+      </div>
+    </section>
   );
 }
 

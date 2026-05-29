@@ -119,7 +119,7 @@ function publicAgent(agent) {
 }
 
 app.get('/api/health', (_request, response) => {
-  response.json({ ok: true, service: 'agentbox-api', timestamp: new Date().toISOString() });
+  response.json({ ok: true, service: 'securagent-api', timestamp: new Date().toISOString() });
 });
 
 app.get('/api/agents', (request, response) => {
@@ -210,5 +210,5 @@ app.get('*', (_request, response) => {
 });
 
 app.listen(port, () => {
-  console.log(`AgentBox listening on ${port}`);
+  console.log(`SecurAgent listening on ${port}`);
 });
