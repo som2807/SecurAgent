@@ -46,6 +46,7 @@ const iconMap = {
 
 const categories = ['All', 'Marketing', 'Trading', 'HR', 'Research'];
 const apiBase = import.meta.env.DEV ? 'http://127.0.0.1:8080' : '';
+const defaultVerificationRepo = 'https://github.com/aditya-mahato-8924/SecurAgent';
 
 async function api(path, options = {}) {
   const response = await fetch(`${apiBase}${path}`, {
@@ -416,7 +417,7 @@ function PublishSection({ onSubmit }) {
     name: '',
     category: '',
     description: '',
-    githubUrl: '',
+    githubUrl: defaultVerificationRepo,
     endpoint: '',
     permissions: ['Internet Access', 'External APIs'],
     runtime: '300 seconds',
@@ -442,7 +443,7 @@ function PublishSection({ onSubmit }) {
         name: form.name,
         category: form.category,
         description: form.description,
-        githubUrl: form.githubUrl,
+        githubUrl: form.githubUrl || defaultVerificationRepo,
         permissions: form.permissions,
         tags: [form.category, 'Submitted'],
         model: form.endpoint ? 'External API' : 'Custom Script'
@@ -468,6 +469,7 @@ function PublishSection({ onSubmit }) {
         <label>Agent Type<select required value={form.category} onChange={(event) => setField('category', event.target.value)}><option value="" disabled>Select type</option><option>Marketing</option><option>Trading</option><option>HR</option><option>Research</option></select></label>
         <label>Description<textarea required value={form.description} onChange={(event) => setField('description', event.target.value)} placeholder="Describe what your agent does, who should use it, and expected outputs." /></label>
         <label>GitHub Repository<input type="url" value={form.githubUrl} onChange={(event) => setField('githubUrl', event.target.value)} placeholder="https://github.com/your-org/your-agent" /></label>
+        <p className="form-help">Submit Verification will audit this repository by default.</p>
         <div className="segmented"><button type="button" className="active">Script</button><button type="button">API Endpoint</button></div>
         <label>Script / API Endpoint<textarea className="code-input" value={form.endpoint} onChange={(event) => setField('endpoint', event.target.value)} placeholder="// Paste Python, Node.js, or endpoint details..." /></label>
         <fieldset>
@@ -480,7 +482,7 @@ function PublishSection({ onSubmit }) {
           <label>Max Runtime<input value={form.runtime} onChange={(event) => setField('runtime', event.target.value)} /></label>
           <label>Memory<input value={form.memory} onChange={(event) => setField('memory', event.target.value)} /></label>
         </div>
-        <div className="drawer-actions"><button type="button" className="secondary-button">Save Draft</button><button type="submit" className="primary-button" disabled={submitting}>{submitting ? 'Submitting...' : 'Submit for Verification'}</button></div>
+        <div className="drawer-actions"><button type="button" className="secondary-button">Save Draft</button><button type="submit" className="primary-button" disabled={submitting}>{submitting ? 'Submitting...' : 'Submit Verification'}</button></div>
       </form>
         </div>
         <div className="section-panel checklist-panel">

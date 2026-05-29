@@ -190,6 +190,7 @@ h1, h2, h3, p { margin: 0; }
 .steps i { height: 1px; background: var(--line); }
 form { display: grid; gap: 14px; }
 label { color: #293640; font-weight: 800; font-size: 13px; }
+.form-help { color: var(--muted); font-size: 12px; font-weight: 700; margin-top: -8px; }
 input, textarea, select {
   width: 100%; margin-top: 7px; border: 1px solid var(--line); border-radius: 8px; padding: 11px 12px; background: white; color: #172126; outline-color: var(--teal);
 }
